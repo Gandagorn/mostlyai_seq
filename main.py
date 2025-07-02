@@ -4,11 +4,9 @@ import random
 import pandas as pd
 import numpy as np
 import argparse
-import logging
 
 from mostlyai import qa
 
-from pipeline.logging_utils import setup_logger
 from pipeline.training import generate_data
 from pipeline.postprocessing import run_refinement
 from pipeline.utils import coherence_report_columns, calculate_accuracy
@@ -45,11 +43,7 @@ if __name__ == '__main__':
     result_output = os.path.join(results_dir, f"seq_result_{timestamp}.csv")
     report_output = os.path.join(results_dir, f"report_{timestamp}.html")
 
-    log_filename = os.path.join(results_dir, f"sequential_pipeline_{timestamp}.log")
-    setup_logger(log_filename)
-    logger = logging.getLogger(__name__)
-
-    logger.info(f"Starting sequential pipeline with timestamp: {timestamp}")
+    print(f"Starting sequential pipeline with timestamp: {timestamp}")
 
     # load in data
     train_df = pd.read_csv(args.data_path)
@@ -83,7 +77,7 @@ if __name__ == '__main__':
 
     is_test = args.test
     if is_test:
-        logger.info("Testing mode enabled: Using smaller dataset and fewer iterations.")
+        print("Testing mode enabled: Using smaller dataset and fewer iterations.")
         train_df = train_df[train_df["group_id"].isin(train_df["group_id"].drop_duplicates().sample(5_000))]
         model_params["sample_size"] = 50_000
         model_params["max_training_time"] = 1
@@ -94,17 +88,17 @@ if __name__ == '__main__':
         postprocessing_params["coherence_max_time"] = 2
         postprocessing_params["refinement_max_time"] = 2
 
-    logger.info(f"Training with {len(train_df)} samples and {train_df['group_id'].nunique()} groups.")
+    print(f"Training with {len(train_df)} samples and {train_df['group_id'].nunique()} groups.")
 
-    logger.info("--- STEP 1: Generating Synthetic Data Pool ---")
+    print("--- STEP 1: Generating Synthetic Data Pool ---")
     synthetic_data = generate_data(
         train_df=train_df,
         model_params=model_params
     )
     synthetic_data.to_csv(pool_file_name, index=False)
-    logger.info(f"Synthetic data pool saved to {pool_file_name}")
+    print(f"Synthetic data pool saved to {pool_file_name}")
 
-    logger.info("--- STEP 2: Post-processing and Refinement ---")
+    print("--- STEP 2: Post-processing and Refinement ---")
     synthetic_pool = pd.read_csv(pool_file_name)
     subset_df = run_refinement(
         synthetic_pool=synthetic_pool,
@@ -112,16 +106,16 @@ if __name__ == '__main__':
         params=postprocessing_params,
     )
 
-    logger.info("--- STEP 3: Final Evaluation and Sanity Checks ---")
-    logger.info(f"Number of samples: {len(subset_df)}")
-    logger.info(f"Number of groups: {subset_df['group_id'].nunique()}")
+    print("--- STEP 3: Final Evaluation and Sanity Checks ---")
+    print(f"Number of samples: {len(subset_df)}")
+    print(f"Number of groups: {subset_df['group_id'].nunique()}")
 
     sequence_lengths = {}
     for df, name in [(train_df, "train"), (subset_df, "subset_df")]:
         group_dist = df["group_id"].value_counts().value_counts().sort_index()
         sequence_lengths[name] = group_dist / group_dist.sum()
 
-    logger.info(f"Sequence lengths comparison:\n{pd.DataFrame(sequence_lengths)}")
+    print(f"Sequence lengths comparison:\n{pd.DataFrame(sequence_lengths)}")
 
     accuracy = calculate_accuracy(
         original_data=train_df.drop(columns="group_id"),
@@ -129,17 +123,17 @@ if __name__ == '__main__':
     )
     coherence = coherence_report_columns(train_df, subset_df)
 
-    logger.info("--- Final Evaluation Scores ---")
+    print("--- Final Evaluation Scores ---")
     combined_score = 0.25 * coherence + 0.75 * accuracy.get('overall_accuracy', 0)
-    logger.info(f"  Coherence      : {coherence:.4f}")
-    logger.info(f"  Accuracy       : {accuracy.get('overall_accuracy', 0):.4f}")
-    logger.info("  --------------------")
+    print(f"  Coherence      : {coherence:.4f}")
+    print(f"  Accuracy       : {accuracy.get('overall_accuracy', 0):.4f}")
+    print("  --------------------")
     for key, value in accuracy.items():
         if key != 'overall_accuracy':
             readable_key = key.replace('_', ' ').title()
-            logger.info(f"    - {readable_key:<20}: {value:.4f}")
-    logger.info(f"  Combined Score : {combined_score:.4f}")
-    logger.info("---------------------------------")
+            print(f"    - {readable_key:<20}: {value:.4f}")
+    print(f"  Combined Score : {combined_score:.4f}")
+    print("---------------------------------")
 
     report, metrics = qa.report(
         trn_tgt_data=train_df.copy(deep=True),
@@ -147,13 +141,13 @@ if __name__ == '__main__':
         tgt_context_key="group_id",
         report_path=report_output,
     )
-    logger.info(f"Mostly QA Report accuracy {metrics.accuracy.overall}")
-    logger.info(f"QA report saved to {report_output}")
+    print(f"Mostly QA Report accuracy {metrics.accuracy.overall}")
+    print(f"QA report saved to {report_output}")
 
-    logger.info("--- STEP 4: Storing Final Result ---")
-    logger.info(f"Storing result to {result_output}")
+    print("--- STEP 4: Storing Final Result ---")
+    print(f"Storing result to {result_output}")
     subset_df.to_csv(result_output, index=False)
 
     duration_hours = (datetime.now() - start_time).total_seconds() / (60 * 60)
-    logger.info(f"Pipeline completed successfully in {duration_hours:.2f} hours.")
+    print(f"Pipeline completed successfully in {duration_hours:.2f} hours.")
 

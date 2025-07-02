@@ -1,6 +1,5 @@
 import gc
 from datetime import datetime
-import logging
 import numba
 from joblib import Parallel, delayed
 from typing import Optional, Dict
@@ -13,7 +12,6 @@ import numpy as np
 from tqdm import tqdm
 from .utils import coherence_report_columns, calculate_accuracy
 
-logger = logging.getLogger(__name__)
 SEQUENCE_LEN_COL = "sequence_length"
 
 @numba.njit(cache=True)
@@ -186,12 +184,12 @@ def refine_subset_by_coherence(
     rng = rng or np.random.default_rng(42)
     feat_cols = [c for c in train_df.columns if c != group_col]
     if not feat_cols:
-        logger.warning("No feature columns found to process for coherence refinement.")
+        print("No feature columns found to process for coherence refinement.")
         return np.array([], dtype=int)
 
     cols_used = rng.choice(feat_cols, size=max(1, int(len(feat_cols) * col_sample)), replace=False)
 
-    logger.info("Coherence Refinement Step 1: Pre-calculating target distributions from train_df...")
+    print("Coherence Refinement Step 1: Pre-calculating target distributions from train_df...")
     targets = {}
     for col in cols_used:
         uniq_tr = train_df.groupby(group_col)[col].nunique()
@@ -208,7 +206,7 @@ def refine_subset_by_coherence(
         tgt_spc = trn_counts[cats].to_numpy()
         targets[f"spc_{col}"] = (tgt_spc, cats)
 
-    logger.info("Coherence Refinement Step 2: Pre-calculating contributions of each group in pool_df...")
+    print("Coherence Refinement Step 2: Pre-calculating contributions of each group in pool_df...")
     pool_ids = pool_df[group_col].unique()
 
     contributions = {}
@@ -228,7 +226,7 @@ def refine_subset_by_coherence(
             group_contrib[spc_key] = np.array([1 if cat in unique_cats_in_group else 0 for cat in cats])
         contributions[group_id] = group_contrib
 
-    logger.info("Coherence Refinement Step 3: Initializing with a random subset...")
+    print("Coherence Refinement Step 3: Initializing with a random subset...")
     current_selection = set(rng.choice(pool_ids, size=target_size, replace=False))
 
     current_hists = {}
@@ -256,9 +254,9 @@ def refine_subset_by_coherence(
         return total_error
 
     current_error = calculate_error(current_hists)
-    logger.info(f"Initial Coherence Error of Random Subset: {current_error:.4f}")
+    print(f"Initial Coherence Error of Random Subset: {current_error:.4f}")
 
-    logger.info("Coherence Refinement Step 4: Iteratively refining the subset by swapping groups...")
+    print("Coherence Refinement Step 4: Iteratively refining the subset by swapping groups...")
     unused_pool = list(set(pool_ids) - current_selection)
     selection_list = list(current_selection)
 
@@ -268,7 +266,7 @@ def refine_subset_by_coherence(
 
     for i in tqdm(range(iterations), desc="Refining Subset"):
         if max_time is not None and ((datetime.now() - coherence_start_time).total_seconds() / 60)  > max_time:
-            logger.info(f"Coherence refinement time limit of {max_time} minutes reached. Stopping early.")
+            print(f"Coherence refinement time limit of {max_time} minutes reached. Stopping early.")
             break
         if not unused_pool: break  # No more groups to swap in
 
@@ -341,9 +339,9 @@ def refine_subset_by_coherence(
         if (i + 1) % 1_000 == 0 or i == (iterations - 1):
             temp_subset_df = pool_df[pool_df[group_col].isin(selection_list)]
             coherence = coherence_report_columns(train_df, temp_subset_df, group_key=group_col)
-            logger.info(f"Iter {i + 1}/{iterations}: L1 Error: {current_error:.4f}, Coherence: {coherence:.4f}")
+            print(f"Iter {i + 1}/{iterations}: L1 Error: {current_error:.4f}, Coherence: {coherence:.4f}")
 
-    logger.info(f"Final Coherence Error after Refinement: {current_error:.4f}")
+    print(f"Final Coherence Error after Refinement: {current_error:.4f}")
     return np.array(selection_list)
 
 
@@ -395,7 +393,7 @@ def choose_groups_by_refinement(
     Returns:
         An array of the final selected group IDs.
     """
-    logger.info("Starting initial group selection using coherence optimization.")
+    print("Starting initial group selection using coherence optimization.")
     initial_string_ids = refine_subset_by_coherence(
         train_df.drop(columns=SEQUENCE_LEN_COL),
         pool_df.drop(columns=SEQUENCE_LEN_COL),
@@ -446,7 +444,7 @@ def choose_groups_by_refinement(
     gid, g_idx = np.unique(pool_df[group_col].to_numpy(), return_inverse=True)
     G = len(gid)
 
-    logger.info("Calculating group contributions in parallel...")
+    print("Calculating group contributions in parallel...")
     contrib_flat = Parallel(n_jobs=n_jobs)(
         delayed(_per_group_counts)(pl_bin_np[c], g_idx, G, t.size)
         for c, t in zip(all_cols_flat, targets_flat)
@@ -457,7 +455,7 @@ def choose_groups_by_refinement(
     contrib = {'uni': contrib_flat[:split1], 'bi': contrib_flat[split1:split2], 'tri': contrib_flat[split2:]}
     targets = {'uni': targets_flat[:split1], 'bi': targets_flat[split1:split2], 'tri': targets_flat[split2:]}
 
-    logger.info("Starting statistical refinement with the coherence-optimized set...")
+    print("Starting statistical refinement with the coherence-optimized set...")
     chosen_mask = np.zeros(G, dtype=bool)
 
     gid_to_int_idx = {gid_str: i for i, gid_str in enumerate(gid)}
@@ -481,7 +479,7 @@ def choose_groups_by_refinement(
         return total_norm_error / num_phases_with_features if num_phases_with_features > 0 else 0
 
     current_error = calculate_normalized_l1(current_hists, targets)
-    logger.info(f"Initial solution error (normalized): {current_error:.6f}")
+    print(f"Initial solution error (normalized): {current_error:.6f}")
 
     current_swap_size = swap_size
     min_swap_size = 1
@@ -489,7 +487,7 @@ def choose_groups_by_refinement(
 
     for i in range(swap_iterations):
         if refinement_max_time is not None and ((datetime.now() - start_time).total_seconds() / 60) > refinement_max_time:
-            logger.info(f"Refinement loop time limit of {refinement_max_time} minutes reached. Stopping early.")
+            print(f"Refinement loop time limit of {refinement_max_time} minutes reached. Stopping early.")
             break
         temperature = initial_temp * (1 - (i / swap_iterations)) ** 2
 
@@ -556,10 +554,10 @@ def choose_groups_by_refinement(
         accepted = False
         if new_error < current_error:
             accepted = True
-            # logger.info(f"Iter {i + 1:3d}/{iterations}: ACCEPTED (IMPROVED) Swapped {current_swap_size}. Err: {current_error:.6f} -> {new_error:.6f}.")
+            # print(f"Iter {i + 1:3d}/{iterations}: ACCEPTED (IMPROVED) Swapped {current_swap_size}. Err: {current_error:.6f} -> {new_error:.6f}.")
         elif temperature > 1e-9 and np.exp((current_error - new_error) / temperature) > rng.random():
             accepted = True
-            # logger.info(f"Iter {i + 1:3d}/{iterations}: ACCEPTED (ANNEALING) Swapped {current_swap_size}. Err: {current_error:.6f} -> {new_error:.6f}.")
+            # print(f"Iter {i + 1:3d}/{iterations}: ACCEPTED (ANNEALING) Swapped {current_swap_size}. Err: {current_error:.6f} -> {new_error:.6f}.")
 
         if accepted:
             chosen_mask[worst_indices], chosen_mask[best_replacements] = False, True
@@ -574,9 +572,9 @@ def choose_groups_by_refinement(
             acc = calculate_accuracy(train_df.drop(columns="group_id"), temp_subset_df.drop(columns="group_id"))
             coherence = coherence_report_columns(train_df, temp_subset_df)
             combined_score = acc.get('overall_accuracy', 0) * 0.75 + coherence * 0.25
-            logger.info(f"Iter {i + 1:4d}/{swap_iterations}: Swap Size: {current_swap_size:3d}, Norm. L1 Err: {current_error:.6f}, Accuracy: {acc.get('overall_accuracy', 0):.6f}, Coherence: {coherence:.4f}, Combined: {combined_score:.4f}")
+            print(f"Iter {i + 1:4d}/{swap_iterations}: Swap Size: {current_swap_size:3d}, Norm. L1 Err: {current_error:.6f}, Accuracy: {acc.get('overall_accuracy', 0):.6f}, Coherence: {coherence:.4f}, Combined: {combined_score:.4f}")
 
-    logger.info(f"Finished refinement in {(datetime.now() - start_time).total_seconds():.2f} seconds.")
+    print(f"Finished refinement in {(datetime.now() - start_time).total_seconds():.2f} seconds.")
     return gid[chosen_mask]
 
 def run_refinement(

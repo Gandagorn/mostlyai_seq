@@ -1,9 +1,7 @@
 import pandas as pd
 from mostlyai.qa._accuracy import bin_data, calculate_univariates, calculate_bivariates, calculate_trivariates
 import numpy as np
-import logging
 
-logger = logging.getLogger(__name__)
 
 def calculate_accuracy(original_data, synthetic_data, variate_level=3):
     ori_bin, bins = bin_data(df=original_data, bins=10)

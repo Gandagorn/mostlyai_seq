@@ -1,9 +1,7 @@
 import pandas as pd
-import logging
 from mostlyai.sdk import MostlyAI
 from .utils import calculate_accuracy, coherence_report_columns
 
-logger = logging.getLogger(__name__)
 
 def train_generator(
         train_df,
@@ -30,7 +28,7 @@ def train_generator(
         dataframes_to_concat.append(temp_df)
 
     oversampled = pd.concat(dataframes_to_concat, ignore_index=True)
-    logger.info(f"Training with {len(oversampled)} samples and {oversampled['group_id'].nunique()} groups")
+    print(f"Training with {len(oversampled)} samples and {oversampled['group_id'].nunique()} groups")
     oversampled_groups = oversampled[['group_id']].drop_duplicates()
 
     g = mostly.train(config={
@@ -112,7 +110,7 @@ def generate_data(
             synthetic_data=synthetic_data_it.drop(columns="group_id"),
         )
         coherence = coherence_report_columns(train_df, synthetic_data_it)
-        logger.info(f"Iteration {i+1}: Generated data accuracy {acc.get('overall_accuracy', 0):.6f} and coherence {coherence:.6f}")
+        print(f"Iteration {i+1}: Generated data accuracy {acc.get('overall_accuracy', 0):.6f} and coherence {coherence:.6f}")
 
     synthetic_data = pd.concat(synthetic_data_list)
     acc = calculate_accuracy(
@@ -120,5 +118,5 @@ def generate_data(
         synthetic_data=synthetic_data.drop(columns="group_id"),
     )
     coherence = coherence_report_columns(train_df, synthetic_data)
-    logger.info(f"Final combined data pool: Accuracy {acc.get('overall_accuracy', 0):.6f} and coherence {coherence:.6f}")
+    print(f"Final combined data pool: Accuracy {acc.get('overall_accuracy', 0):.6f} and coherence {coherence:.6f}")
     return synthetic_data
