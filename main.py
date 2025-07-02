@@ -46,7 +46,8 @@ if __name__ == '__main__':
     report_output = os.path.join(results_dir, f"report_{timestamp}.html")
 
     log_filename = os.path.join(results_dir, f"sequential_pipeline_{timestamp}.log")
-    logger = setup_logger('main_logger', log_filename)
+    setup_logger(log_filename)
+    logger = logging.getLogger(__name__)
 
     logger.info(f"Starting sequential pipeline with timestamp: {timestamp}")
 
@@ -65,8 +66,8 @@ if __name__ == '__main__':
         rare_category_replacement_method="SAMPLE",
         max_epochs=16,
         max_training_time=60*3, # 3 hours
-        sample_size=150_000,
-        train_iterations=2,
+        sample_size=300_000,
+        train_iterations=3,
     )
 
     postprocessing_params = dict(
