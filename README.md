@@ -29,10 +29,7 @@ This pipeline was designed to be robust, efficient, and adaptable, making it a s
 
   * **Model Agnostic**: The refinement pipeline works with **any source of synthetic sequential data**. While this project uses the `mostlyai` SDK for the initial pool generation, you could substitute it with any generative model. The strength of the final output comes from the post-processing, greatly enhancing the quality of any base synthetic dataset.
 
-  * **Performance-Optimized**: The entire post-processing pipeline is engineered for efficiency:
-
-      * **Low Memory Footprint**: By converting data into binned, integer-based representations and extensively using `scipy.sparse` matrices to manage per-group contributions, the algorithms operate with very low memory overhead. The core logic is further accelerated with `numba` for time-critical computations.
-      * **CPU-Friendly Refinement**: The entire multi-stage refinement process is CPU-bound.
+  * **Performance-Optimized**: By converting data into binned, integer-based representations and extensively using `scipy.sparse` matrices to manage per-group contributions, the algorithms operate with very low memory overhead. The core logic is further accelerated with `numba` for time-critical computations.
 
   * **Privacy Guarantees**: By selecting from a vast, pre-generated pool based on aggregate statistical distributions (up to the trivariate level), the risk of replicating individual records or their sensitive combinations is minimal. The final dataset copies the *statistical patterns* of the original data, not the data points themselves, ensuring privacy-safe output.
 
@@ -71,6 +68,8 @@ The script will:
 3.  Install all required Python packages from `requirements.txt`.
 4.  Activate the virtual environment.
 5.  Run the main pipeline script (`main.py`) with the provided data path.
+
+All dependencies are pinned in `requirements.txt` for reproducibility. This file was generated from `requirements.in` using `uv pip compile`.
 
 ## Output
 

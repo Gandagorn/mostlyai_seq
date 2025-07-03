@@ -124,6 +124,7 @@ if __name__ == '__main__':
     coherence = coherence_report_columns(train_df, subset_df)
 
     print("--- Final Evaluation Scores ---")
+    print("  Using Local Validation Metrics")
     combined_score = 0.25 * coherence + 0.75 * accuracy.get('overall_accuracy', 0)
     print(f"  Coherence      : {coherence:.4f}")
     print(f"  Accuracy       : {accuracy.get('overall_accuracy', 0):.4f}")
